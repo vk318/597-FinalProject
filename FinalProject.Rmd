@@ -1,0 +1,236 @@
+---
+title: "Data Wrangling Final"
+author: "Varun Krishnan"
+date: "5/2/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+
+team_data <- read.csv("MTeams.csv")
+reg_game_data <- read.csv("MRegularSeasonDetailedResults.csv")
+tourn_game_data <- read.csv("MNCAATourneyDetailedResults.csv")
+```
+
+```{r}
+combined_game_data <- bind_rows(reg_game_data, tourn_game_data)
+```
+
+```{r}
+colSums(is.na(combined_game_data))
+```
+
+```{r}
+colSums(is.na(team_data))
+```
+
+```{r}
+combined_game_data <- combined_game_data %>% select(-c(Season,DayNum))
+```
+
+```{r}
+combined_game_data <- combined_game_data %>% 
+  left_join(team_data, by = c("WTeamID" = "TeamID")) %>%
+  select(-c(FirstD1Season,LastD1Season)) %>%
+  rename(c("WTeamName" = "TeamName")) %>%
+  left_join(team_data, by = c("LTeamID" = "TeamID")) %>%
+  select(-c(FirstD1Season,LastD1Season)) %>%
+  rename(c("LTeamName" = "TeamName")) %>%
+  select(WTeamName, LTeamName, everything())
+```
+
+```{r}
+wins_losses <- data.frame(matrix(ncol=3,nrow=0,
+                                 dimnames=list(NULL, c("name", "wins", "losses"))))
+for(i in 1101:1471) {
+  name = team_data %>% filter(TeamID == i) %>% select(TeamName) %>% .[[1]]
+  if( nrow(combined_game_data %>% count(WTeamID == i)) == 1){
+    next
+  }
+  wins = combined_game_data %>% count(WTeamID == i) %>% 
+    select(n) %>% .[[2,1]]
+  if( nrow(combined_game_data %>% count(LTeamID == i)) == 1){
+    next
+  }
+  losses = combined_game_data %>% count(LTeamID == i) %>% 
+    select(n) %>% .[[2,1]]
+  df = data.frame(name = name, wins = wins, losses = losses)
+  wins_losses <- rbind(wins_losses,df)
+}
+```
+
+```{r}
+library(ggplot2)
+ggplot(wins_losses, aes(x=wins, y=losses)) + geom_point() +
+  geom_point(data=wins_losses[wins_losses$name == "Rutgers",],
+             pch=21, fill=NA, size=4, colour="red", stroke=1) +
+  geom_abline(intercept = 0, slope = 1, colour = "red") +
+  ggtitle("Losses vs. Wins since 2003 - Red line = 0.5 boundary") +
+  theme_bw()
+```
+
+```{r}
+#random <- sample_n(combined_game_data, 93947)
+random <- combined_game_data %>%
+  mutate(WFGM2 = WFGM - WFGM3) %>%
+  mutate(WFGA2 = WFGA - WFGA3) %>%
+  mutate(LFGM2 = LFGM - LFGM3) %>%
+  mutate(LFGA2 = LFGA - LFGA3)
+```
+
+```{r}
+boxplot_data <- random %>%
+  select(WFGM2) %>% 
+  rename(c("len" = "WFGM2")) %>% 
+  mutate(type = "2-point made") %>%
+  mutate(outcome = "Win")
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(LFGM2) %>% 
+    rename(c("len" = "LFGM2")) %>% 
+    mutate(type = "2-point made") %>%
+    mutate(outcome = "Loss"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(WFGA2) %>% 
+    rename(c("len" = "WFGA2")) %>% 
+    mutate(type = "2-point attempt") %>%
+    mutate(outcome = "Win"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(LFGA2) %>% 
+    rename(c("len" = "LFGA2")) %>% 
+    mutate(type = "2-point attempt") %>%
+    mutate(outcome = "Loss"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(WFGM3) %>% 
+    rename(c("len" = "WFGM3")) %>% 
+    mutate(type = "3-point made") %>%
+    mutate(outcome = "Win"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(LFGM3) %>% 
+    rename(c("len" = "LFGM3")) %>% 
+    mutate(type = "3-point made") %>%
+    mutate(outcome = "Loss"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(WFGA3) %>% 
+    rename(c("len" = "WFGA3")) %>% 
+    mutate(type = "3-point attempt") %>%
+    mutate(outcome = "Win"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(LFGA3) %>% 
+    rename(c("len" = "LFGA3")) %>% 
+    mutate(type = "3-point attempt") %>%
+    mutate(outcome = "Loss"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(WFTM) %>% 
+    rename(c("len" = "WFTM")) %>% 
+    mutate(type = "Foul shot made") %>%
+    mutate(outcome = "Win"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(LFTM) %>% 
+    rename(c("len" = "LFTM")) %>% 
+    mutate(type = "Foul shot made") %>%
+    mutate(outcome = "Loss"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(WFTA) %>% 
+    rename(c("len" = "WFTA")) %>% 
+    mutate(type = "Foul shot attempt") %>%
+    mutate(outcome = "Win"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(LFTA) %>% 
+    rename(c("len" = "LFTA")) %>% 
+    mutate(type = "Foul shot attempt") %>%
+    mutate(outcome = "Loss"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(WOR) %>% 
+    rename(c("len" = "WOR")) %>% 
+    mutate(type = "Off. rebound") %>%
+    mutate(outcome = "Win"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(LOR) %>% 
+    rename(c("len" = "LOR")) %>% 
+    mutate(type = "Off. rebound") %>%
+    mutate(outcome = "Loss"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(WAst) %>% 
+    rename(c("len" = "WAst")) %>% 
+    mutate(type = "Assist") %>%
+    mutate(outcome = "Win"))
+
+boxplot_data <- bind_rows(boxplot_data, random %>%
+    select(LAst) %>% 
+    rename(c("len" = "LAst")) %>% 
+    mutate(type = "Assist") %>%
+    mutate(outcome = "Loss"))
+
+ggplot(boxplot_data, aes(x=type, y=len, fill=outcome)) +
+  geom_boxplot() + scale_fill_manual(values = c("red","green")) +
+  xlab("Offensive Stat Type") + ylab("Count") +
+  ggtitle("A measure of 8 offensive basketball tracked statistics in wins + losses of Division1 NCAA Men's Basketball") + theme(axis.text.x = element_text(angle = 30))
+
+
+```
+
+```{r}
+
+def_boxplot_data <- random %>%
+  select(WDR) %>% 
+  rename(c("len" = "WDR")) %>% 
+  mutate(type = "Def. Rebound") %>%
+  mutate(outcome = "Win")
+
+def_boxplot_data <- bind_rows(def_boxplot_data, random %>%
+    select(LDR) %>% 
+    rename(c("len" = "LDR")) %>% 
+    mutate(type = "Def. Rebound") %>%
+    mutate(outcome = "Loss"))
+
+def_boxplot_data <- bind_rows(def_boxplot_data, random %>%
+    select(WStl) %>% 
+    rename(c("len" = "WStl")) %>% 
+    mutate(type = "Steal") %>%
+    mutate(outcome = "Win"))
+
+def_boxplot_data <- bind_rows(def_boxplot_data, random %>%
+    select(LStl) %>% 
+    rename(c("len" = "LStl")) %>% 
+    mutate(type = "Steal") %>%
+    mutate(outcome = "Loss"))
+
+def_boxplot_data <- bind_rows(def_boxplot_data, random %>%
+    select(WBlk) %>% 
+    rename(c("len" = "WBlk")) %>% 
+    mutate(type = "Block") %>%
+    mutate(outcome = "Win"))
+
+def_boxplot_data <- bind_rows(def_boxplot_data, random %>%
+    select(LBlk) %>% 
+    rename(c("len" = "LBlk")) %>% 
+    mutate(type = "Block") %>%
+    mutate(outcome = "Loss"))
+
+ggplot(def_boxplot_data, aes(x=type, y=len, fill=outcome)) +
+  geom_boxplot() + scale_fill_manual(values = c("red","green")) +
+  xlab("Defensive Stat Type") + ylab("Count") +
+  ggtitle("A measure of 3 defensive basketball tracked statistics in wins + losses of Division1 NCAA Men's Basketball")
+
+
+```
+
